@@ -9,6 +9,7 @@ import (
 	"github.com/seaweedfs/seaweedfs/weed/pb/volume_server_pb"
 	_ "github.com/seaweedfs/seaweedfs/weed/storage/backend/rclone_backend"
 	_ "github.com/seaweedfs/seaweedfs/weed/storage/backend/s3_backend"
+	_ "github.com/seaweedfs/seaweedfs/weed/storage/backend/walrus_backend"
 	"github.com/seaweedfs/seaweedfs/weed/util"
 )
 
