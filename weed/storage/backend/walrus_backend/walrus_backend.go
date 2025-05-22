@@ -1,6 +1,3 @@
-//go:build walrus
-// +build walrus
-
 package walrus_backend
 
 import (
@@ -41,17 +38,17 @@ func (factory *WalrusBackendFactory) BuildStorage(configuration backend.StringPr
 
 type WalrusBackendStorage struct {
 	id              string
-	remoteName      string	
+	remoteName      string
 	keyTemplate     *template.Template
 	keyTemplateText string
 	client          Walrus.Client
 
 	//TODO
-	aggregatorURLs	[]string
-	publisherURLs	[]string
+	aggregatorURLs []string
+	publisherURLs  []string
 	// TODO
-	encryptionKey	[]byte // base64 encoded key
-	encryptionSuite	string // AES256GCM (default) or AES256CBC
+	encryptionKey   []byte // base64 encoded key
+	encryptionSuite string // AES256GCM (default) or AES256CBC
 }
 
 func newWalrusBackendStorage(configuration backend.StringProperties, configPrefix string, id string) (s *WalrusBackendStorage, err error) {
@@ -68,7 +65,7 @@ func newWalrusBackendStorage(configuration backend.StringProperties, configPrefi
 	}
 	s.encryptionSuite = configuration.GetString(configPrefix + "encryption_suite")
 
-	s.client = Walrus.NewClient(s.remoteName);	
+	s.client = Walrus.NewClient(s.remoteName)
 	if err != nil {
 		return
 	}
@@ -268,4 +265,3 @@ func (walrusBackendStorageFile WalrusBackendStorageFile) Name() string {
 func (walrusBackendStorageFile WalrusBackendStorageFile) Sync() error {
 	return nil
 }
-ZZZZ
