@@ -1,0 +1,62 @@
+services:
+  walrus3:
+    image: chrislusf/seaweedfs:latest
+    ports:
+      - "8888:8888"  # master
+      - "8080:8080"  # volume
+      - "8333:8333"  # filer
+      - "9000:9000"  # s3
+    volumes:
+      - seaweedfs_data:/data
+    command: server -master.port=8888 -volume.port=8080 -filer.port=8333 -s3.port=9000
+    environment:
+      - WEED_MASTER_DEFAULT_REPLICATION=001
+      - WEED_MASTER_DEFAULT_VOLUME_SIZE_LIMIT=30000
+
+  awscli:
+    image: amazon/aws-cli
+    profiles: ["testcli"]
+    stdin_open: true
+    tty: true
+
+  s3local:
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEBUG=1
+      - DATA_DIR=/var/localstack/s3
+    volumes:
+      - ./var/s3local_data:/var/localstack/s3
+
+  nextcloud:
+    image: nextcloud:latest
+    ports:
+      - "8081:80"
+    volumes:
+      - nextcloud_data:/var/www/html
+    environment:
+      - NEXTCLOUD_ADMIN_USER=admin
+      - NEXTCLOUD_ADMIN_PASSWORD=admin
+      - NEXTCLOUD_TRUSTED_DOMAINS=localhost
+      - PHP_MEMORY_LIMIT=2G
+      - PHP_UPLOAD_LIMIT=15G
+
+      # - MYSQL_HOST=db
+      # - MYSQL_DATABASE=nextcloud
+      # - MYSQL_USER=nextcloud
+      # - MYSQL_PASSWORD=${NC_MYSQL_PASSWORD}
+    
+    # env_file: "walrus.env"
+    # env_file: "localstack.env"
+
+    depends_on:
+      - s3local
+      # - seaweedfs
+
+
+volumes:
+  seaweedfs_data:
+  nextcloud_data:
+  localstack_data:
