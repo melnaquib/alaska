@@ -12,9 +12,10 @@ docker build -f docker/Dockerfile.go_build .
 docker compose up
 docker compose ip awscli
 
-#run local
-# cp --parents master.toml ~/.seaweed/master.toml
-# weed -v=1 master -ip=walrus3 s3 -s3.port=4566 -volumeSizeLimitMB=10
+# Run local
+
+#### cp --parents master.toml ~/.seaweed/master.toml
+#### weed -v=1 master -ip=walrus3 s3 -s3.port=4566 -volumeSizeLimitMB=10
 
 
 cd weed
@@ -26,7 +27,7 @@ weed s3 &
 
 echo "lock;volume.tier.upload -dest walrus -fullPercent=95 -quietFor=1h;unlock" | weed shell
 
-aws --no-sign-request --endpoint-url="http://localhost:4566" s3 ls nxc01
+aws --no-sign-request --endpoint-url="http://172.17.0.1:8333" s3 ls nxc01
 
 docker compose up nextcloud
 
