@@ -95,3 +95,7 @@ docker/weed_sub
 docker/weed_pub
 weed/mq/schema/example.parquet
 docker/agent_sub_record
+
+var/*
+weed/filerldb2/*
+weed/__debug_bin

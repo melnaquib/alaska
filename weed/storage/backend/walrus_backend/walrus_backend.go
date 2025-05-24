@@ -2,18 +2,17 @@ package walrus_backend
 
 import (
 	"bytes"
-	"context"
+	// "context"
+	"encoding/base64"
 	"fmt"
-	"github.com/namihq/walrus-go/fs/config/configfile"
+	"github.com/namihq/walrus-go"
 	"github.com/seaweedfs/seaweedfs/weed/util"
-	"io"
+	"log"
 	"os"
 	"text/template"
 	"time"
 
 	"github.com/google/uuid"
-
-	"github.com/namihq/walrus-go"
 
 	"github.com/seaweedfs/seaweedfs/weed/glog"
 	"github.com/seaweedfs/seaweedfs/weed/pb/volume_server_pb"
@@ -21,8 +20,8 @@ import (
 )
 
 func init() {
+	glog.Infof("Init Walrus Backend")
 	backend.BackendStorageFactories["walrus"] = &WalrusBackendFactory{}
-	configfile.Install()
 }
 
 type WalrusBackendFactory struct {
@@ -41,7 +40,7 @@ type WalrusBackendStorage struct {
 	remoteName      string
 	keyTemplate     *template.Template
 	keyTemplateText string
-	client          Walrus.Client
+	client          *walrus_go.Client
 
 	//TODO
 	aggregatorURLs []string
@@ -56,8 +55,8 @@ func newWalrusBackendStorage(configuration backend.StringProperties, configPrefi
 	s.id = id
 	s.remoteName = configuration.GetString(configPrefix + "remote_name")
 
-	s.aggregatorURLs = configuration.GetString(configPrefix + "aggregator_urls").Split(",")
-	s.publisherURLs = configuration.GetString(configPrefix + "publisher_urls").Split(",")
+	// s.aggregatorURLs = configuration.GetString(configPrefix + "aggregator_urls").Split(",")
+	// s.publisherURLs = configuration.GetString(configPrefix + "publisher_urls").Split(",")
 
 	s.encryptionKey, err = base64.StdEncoding.DecodeString(configuration.GetString(configPrefix + "encryption_key"))
 	if err != nil {
@@ -65,7 +64,7 @@ func newWalrusBackendStorage(configuration backend.StringProperties, configPrefi
 	}
 	s.encryptionSuite = configuration.GetString(configPrefix + "encryption_suite")
 
-	s.client = Walrus.NewClient(s.remoteName)
+	s.client = walrus_go.NewClient()
 	if err != nil {
 		return
 	}
@@ -86,10 +85,12 @@ func (s *WalrusBackendStorage) ToProperties() map[string]string {
 
 func keyFromBlobId(id string) (key string) {
 	key = id
+	return
 }
 
 func blobIdFromkey(key string) (id string) {
 	id = key
+	return
 }
 
 func formatKey(key string, storage WalrusBackendStorage) (fKey string, err error) {
@@ -130,17 +131,15 @@ func (s *WalrusBackendStorage) CopyFile(f *os.File, fn func(progressed int64, pe
 	glog.V(1).Infof("copy dat file of %s to remote walrus.%s as %s", f.Name(), s.id, key)
 
 	util.Retry("upload via Walrus", func() error {
-		size, err = uploadViaWalrus(s.fs, f.Name(), key, fn)
+		size, err = uploadViaWalrus(s.client, f.Name(), key, fn)
 		return err
 	})
 
 	return
 }
 
-func uploadViaWalrus(rfs fs.Fs, filename string, key string, fn func(progressed int64, percentage float32) error) (fileSize int64, err error) {
-	// ctx := context.TODO()
-
-	fileBlobID, err := client.StoreFile(filename, &walrus.StoreOptions{Epochs: 5})
+func uploadViaWalrus(client *walrus_go.Client, filename string, key string, fn func(progressed int64, percentage float32) error) (fileSize int64, err error) {
+	fileBlobID, err := client.StoreFile(filename, &walrus_go.StoreOptions{Epochs: 5})
 	if err != nil {
 		log.Fatalf("Error storing file: %v", err)
 	}
@@ -152,24 +151,25 @@ func uploadViaWalrus(rfs fs.Fs, filename string, key string, fn func(progressed 
 		return
 	}
 	fileSize = fileInfo.Size()
-	progressed = fileSize
+	progressed := fileSize
 	fn(progressed, 100)
+	return fileSize, nil
 }
 
 func (s *WalrusBackendStorage) DownloadFile(filename string, key string, fn func(progressed int64, percentage float32) error) (size int64, err error) {
 	glog.V(1).Infof("download dat file of %s from remote walrus.%s as %s", filename, s.id, key)
 
 	util.Retry("download via Walrus", func() error {
-		size, err = downloadViaWalrus(s.fs, filename, key, fn)
+		size, err = downloadViaWalrus(s.client, filename, key, fn)
 		return err
 	})
 
 	return
 }
 
-func downloadViaWalrus(fs fs.Fs, filename string, key string, fn func(progressed int64, percentage float32) error) (fileSize int64, err error) {
+func downloadViaWalrus(client *walrus_go.Client, filename string, key string, fn func(progressed int64, percentage float32) error) (fileSize int64, err error) {
 	// ctx := context.TODO()
-	err = client.ReadToFile(key, filename)
+	err = client.ReadToFile(key, filename, nil)
 	if err != nil {
 		log.Fatalf("Error Reading To file: %v", err)
 		return
@@ -179,31 +179,25 @@ func downloadViaWalrus(fs fs.Fs, filename string, key string, fn func(progressed
 		log.Fatalf("Error reading file info: %v", err)
 		return
 	}
-	written = fileInfo.Size()
-	progressed = written
+	written := fileInfo.Size()
+	progressed := written
 	fn(progressed, 100)
+	return fileSize, nil
 }
 
 func (s *WalrusBackendStorage) DeleteFile(key string) (err error) {
 	glog.V(1).Infof("delete dat file %s from remote", key)
 
 	util.Retry("delete via Walrus", func() error {
-		err = deleteViaWalrus(s.fs, key)
+		err = deleteViaWalrus(s.client, key)
 		return err
 	})
-
 	return
 }
 
-func deleteViaWalrus(fs fs.Fs, key string) (err error) {
-	ctx := context.TODO()
-
-	obj, err := fs.NewObject(ctx, key)
-	if err != nil {
-		return err
-	}
-
-	return obj.Remove(ctx)
+func deleteViaWalrus(client *walrus_go.Client, key string) (err error) {
+	// TODO: sdk does not have
+	return nil
 }
 
 type WalrusBackendStorageFile struct {
@@ -213,28 +207,7 @@ type WalrusBackendStorageFile struct {
 }
 
 func (walrusBackendStorageFile WalrusBackendStorageFile) ReadAt(p []byte, off int64) (n int, err error) {
-	ctx := context.TODO()
-
-	obj, err := walrusBackendStorageFile.backendStorage.fs.NewObject(ctx, walrusBackendStorageFile.key)
-	if err != nil {
-		return 0, err
-	}
-
-	opt := fs.RangeOption{Start: off, End: off + int64(len(p)) - 1}
-
-	rc, err := obj.Open(ctx, &opt)
-	defer func(rc io.ReadCloser) {
-		err := rc.Close()
-		if err != nil {
-			return
-		}
-	}(rc)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return io.ReadFull(rc, p)
+	panic("not implemented")
 }
 
 func (walrusBackendStorageFile WalrusBackendStorageFile) WriteAt(p []byte, off int64) (n int, err error) {
@@ -250,12 +223,13 @@ func (walrusBackendStorageFile WalrusBackendStorageFile) Close() error {
 }
 
 func (walrusBackendStorageFile WalrusBackendStorageFile) GetStat() (datSize int64, modTime time.Time, err error) {
-	metadata, err := client.Head(walrusBackendStorageFile.key)
+	metadata, err := walrusBackendStorageFile.backendStorage.client.Head(walrusBackendStorageFile.key)
 	if err != nil {
 		return
 	}
 	datSize = metadata.ContentLength
-	modTime = time.Unix(int64(metadata.LastModified), 0)
+	modTime, err = time.Parse(time.RFC3339, metadata.LastModified)
+	return
 }
 
 func (walrusBackendStorageFile WalrusBackendStorageFile) Name() string {

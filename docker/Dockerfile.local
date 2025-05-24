@@ -31,6 +31,7 @@ RUN mkdir -p /data/filerldb2
 VOLUME /data
 WORKDIR /data
 
+COPY  ./weed /usr/bin/
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

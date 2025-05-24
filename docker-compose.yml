@@ -1,62 +1,88 @@
 services:
   walrus3:
-    image: chrislusf/seaweedfs:latest
+    profiles:
+      - profile1
+    build:
+      context: docker
+      dockerfile: Dockerfile.local
     ports:
-      - "8888:8888"  # master
-      - "8080:8080"  # volume
-      - "8333:8333"  # filer
-      - "9000:9000"  # s3
-    volumes:
-      - seaweedfs_data:/data
-    command: server -master.port=8888 -volume.port=8080 -filer.port=8333 -s3.port=9000
-    environment:
-      - WEED_MASTER_DEFAULT_REPLICATION=001
-      - WEED_MASTER_DEFAULT_VOLUME_SIZE_LIMIT=30000
+      - 9333:9333
+      - 19333:19333
+      - 18888:18888
+      - 8333:8333
+      
+      # - 18080:18080
+      - 8080:8080
+      - 8888:8888
+      - 18888:18888
 
+      - 8888:8888  # master
+      - 8080:8080  # volume
+      - 8333:8333  # filer
+      - 4566:4566  # s3
+
+    command: "-v=1 master -ip=walrus3 s3 -s3.port=4566 -volumeSizeLimitMB=10"
+    # entrypoint: /bin/sh -c
+    # command: weed server -s3"
+    # command: '-v=1 iam -filer="filer:8888" -master="master:9333"'
+    # command: "-v=1 volume -mserver=master:9333 -port=8080 -ip=volume -preStopSeconds=1 -max=10000"
+    # command: '-v=1 filer -ip.bind=0.0.0.0 -master="master:9333"'
+    # command: '-v=1 s3 -filer="filer:8888" -ip.bind=s3'
+    # command: server -master.port=8888 -volume.port=8080 -filer.port=8333 -s3.port=9000
+
+    environment:
+      - WEED_MASTER_DEFAULT_REPLICATION:001
+      # - WEED_MASTER_DEFAULT_VOLUME_SIZE_LIMIT:10
+
+    volumes:
+      - ./var/seaweedfs_data:/data
+      - ./walrus/test/etc/master.toml:/etc/seaweedfs/master.toml
+      
   awscli:
     image: amazon/aws-cli
     profiles: ["testcli"]
-    stdin_open: true
     tty: true
+    stdin_open: true
+    entrypoint: bash
+    # command: "/bin/bash"
 
-  s3local:
-    image: localstack/localstack
-    ports:
-      - "4566:4566"
     environment:
-      - SERVICES=s3
-      - DEBUG=1
-      - DATA_DIR=/var/localstack/s3
+      # - AWS_DEFAULT_ENDPOINT:http://walrus3:4566
+      - AWS_DEFAULT_ENDPOINT:http://172.17.0.1:8333
+      - AWS_NO_SIGN_REQUEST:true
+
+    # aws --no-sign-request --endpoint-url="http://localhost:4566" s3 ls nxc01
+
+
+  locals3:
+    image: localstack/localstack
     volumes:
+      - ./var/nextcloud:/var/www/html
       - ./var/s3local_data:/var/localstack/s3
+    ports:
+      - "14566:14566"
+      # - 80:80
+      - "8081:80"
+
+    environment:
+      - SERVICES:s3
+      - DEBUG:1
+      - DATA_DIR:/var/localstack/s3
 
   nextcloud:
     image: nextcloud:latest
     ports:
-      - "8081:80"
-    volumes:
-      - nextcloud_data:/var/www/html
+      - 30080:80
     environment:
-      - NEXTCLOUD_ADMIN_USER=admin
-      - NEXTCLOUD_ADMIN_PASSWORD=admin
-      - NEXTCLOUD_TRUSTED_DOMAINS=localhost
-      - PHP_MEMORY_LIMIT=2G
-      - PHP_UPLOAD_LIMIT=15G
+      - SQLITE_DATABASE:nextcloud
+      - NEXTCLOUD_ADMIN_USER:admin
+      - NEXTCLOUD_ADMIN_PASSWORD:admin
+      - NEXTCLOUD_TRUSTED_DOMAINS:localhost
+      - PHP_MEMORY_LIMIT:2G
+      - PHP_UPLOAD_LIMIT:15G
+      - SERVER_NAME:localhost
 
-      # - MYSQL_HOST=db
-      # - MYSQL_DATABASE=nextcloud
-      # - MYSQL_USER=nextcloud
-      # - MYSQL_PASSWORD=${NC_MYSQL_PASSWORD}
-    
     # env_file: "walrus.env"
-    # env_file: "localstack.env"
+    # env_file: "walrus/test/locals3.env"
+    # env_file: "walrus/test/localhost.env"
 
-    depends_on:
-      - s3local
-      # - seaweedfs
-
-
-volumes:
-  seaweedfs_data:
-  nextcloud_data:
-  localstack_data:

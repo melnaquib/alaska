@@ -1,0 +1,6 @@
+# The storage backends are configured on the master, inside master.toml
+[storage.backend]
+	[storage.backend.walrus.default]
+	enabled = true
+	bucket = "nxc01"          # an existing bucket
+	# storage_class = "STANDARD_IA"
